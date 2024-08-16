@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/gogf/gf/v2/container/garray"
+	"github.com/gogf/gf/v2/encoding/ghash"
 	"github.com/gogf/gf/v2/encoding/gjson"
 	"github.com/gogf/gf/v2/internal/empty"
 	"github.com/gogf/gf/v2/internal/intlog"
@@ -58,12 +59,13 @@ type iTableName interface {
 }
 
 const (
-	OrmTagForStruct    = "orm"
-	OrmTagForTable     = "table"
-	OrmTagForWith      = "with"
-	OrmTagForWithWhere = "where"
-	OrmTagForWithOrder = "order"
-	OrmTagForDo        = "do"
+	OrmTagForStruct       = "orm"
+	OrmTagForTable        = "table"
+	OrmTagForWith         = "with"
+	OrmTagForWithWhere    = "where"
+	OrmTagForWithOrder    = "order"
+	OrmTagForWithUnscoped = "unscoped"
+	OrmTagForDo           = "do"
 )
 
 var (
@@ -775,11 +777,7 @@ func formatWhereKeyValue(in formatWhereKeyValueInput) (newArgs []interface{}) {
 			} else {
 				in.Buffer.WriteString(quotedKey)
 			}
-			if s, ok := in.Value.(Raw); ok {
-				in.Buffer.WriteString(gconv.String(s))
-			} else {
-				in.Args = append(in.Args, in.Value)
-			}
+			in.Args = append(in.Args, in.Value)
 		}
 	}
 	return in.Args
@@ -943,4 +941,27 @@ func FormatMultiLineSqlToSingle(sql string) (string, error) {
 		return "", err
 	}
 	return sql, nil
+}
+
+func genTableFieldsCacheKey(group, schema, table string) string {
+	return fmt.Sprintf(
+		`%s%s@%s#%s`,
+		cachePrefixTableFields,
+		group,
+		schema,
+		table,
+	)
+}
+
+func genSelectCacheKey(table, group, schema, name, sql string, args ...interface{}) string {
+	if name == "" {
+		name = fmt.Sprintf(
+			`%s@%s#%s:%d`,
+			table,
+			group,
+			schema,
+			ghash.BKDR64([]byte(sql+", @PARAMS:"+gconv.String(args))),
+		)
+	}
+	return fmt.Sprintf(`%s%s`, cachePrefixSelectCache, name)
 }
